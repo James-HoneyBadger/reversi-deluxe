@@ -51,7 +51,7 @@ import struct
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 
 import pygame as pg
 
@@ -546,10 +546,23 @@ class Settings:
     ai_depth: int = 4
     board_size: int = 8
     stats: Optional[PlayerStats] = None
+    # New visual settings
+    show_grid: bool = True
+    piece_style: str = "traditional"  # traditional, modern, emoji
+    font_size_multiplier: float = 1.0  # 0.8 to 1.5
+    zoom_level: float = 1.0  # 0.5 to 2.0
+    board_rotation: int = 0  # 0, 90, 180, 270 degrees
+    show_move_preview: bool = True
+    show_hint_intensity: bool = True
+    per_difficulty_stats: Optional[Dict[int, PlayerStats]] = None
 
     def __post_init__(self):
         if self.stats is None:
             self.stats = PlayerStats()
+        if self.per_difficulty_stats is None:
+            self.per_difficulty_stats = {}
+            for depth in range(1, 7):
+                self.per_difficulty_stats[depth] = PlayerStats()
 
     @staticmethod
     def load() -> "Settings":
@@ -558,11 +571,12 @@ class Settings:
                 d = json.load(f)
             # Handle stats data specially since it's a complex object
             stats_data = d.pop("stats", None)
+            per_diff_stats_data = d.pop("per_difficulty_stats", None)
 
             # Remove deprecated time control fields
             deprecated_fields = ["time_enabled", "time_limit", "time_increment"]
-            for field in deprecated_fields:
-                d.pop(field, None)
+            for fld in deprecated_fields:
+                d.pop(fld, None)
 
             settings = Settings(**d)
             if stats_data:
@@ -572,6 +586,19 @@ class Settings:
                     recent_results.append(GameResult(**result_data))
                 stats_data["recent_results"] = recent_results
                 settings.stats = PlayerStats(**stats_data)
+
+            if per_diff_stats_data:
+                # Convert per-difficulty stats
+                settings.per_difficulty_stats = {}
+                for depth_str, pds_data in per_diff_stats_data.items():
+                    recent_results = []
+                    for result_data in pds_data.get("recent_results", []):
+                        recent_results.append(GameResult(**result_data))
+                    pds_data["recent_results"] = recent_results
+                    settings.per_difficulty_stats[int(depth_str)] = PlayerStats(
+                        **pds_data
+                    )
+
             return settings
         except (FileNotFoundError, json.JSONDecodeError, KeyError):
             return Settings()
@@ -588,6 +615,18 @@ class Settings:
                     result.__dict__ for result in self.stats.recent_results
                 ]
                 data["stats"] = stats_dict
+
+            if self.per_difficulty_stats:
+                # Convert per-difficulty stats to serializable format
+                per_diff_dict = {}
+                for depth, pds in self.per_difficulty_stats.items():
+                    pds_dict = pds.__dict__.copy()
+                    pds_dict["recent_results"] = [
+                        result.__dict__ for result in pds.recent_results
+                    ]
+                    per_diff_dict[str(depth)] = pds_dict
+                data["per_difficulty_stats"] = per_diff_dict
+
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
         except (PermissionError, OSError, ValueError) as e:
@@ -714,6 +753,26 @@ THEMES = {
         "text": (30, 60, 25),
         "accent": (80, 160, 70),
         "danger": (200, 80, 80),
+    },
+    "colorblind_friendly": {
+        "name": "colorblind_friendly",
+        "display": "Colorblind (Blue/Orange)",
+        "felt": (65, 90, 120),
+        "grid": (40, 60, 85),
+        "hud": (245, 245, 250),
+        "text": (30, 30, 40),
+        "accent": (230, 140, 30),  # Orange
+        "danger": (200, 60, 60),
+    },
+    "high_contrast": {
+        "name": "high_contrast",
+        "display": "High Contrast",
+        "felt": (0, 0, 0),
+        "grid": (255, 255, 255),
+        "hud": (255, 255, 255),
+        "text": (0, 0, 0),
+        "accent": (0, 120, 255),
+        "danger": (255, 0, 0),
     },
 }
 WOOD = (70, 45, 30)
@@ -1234,6 +1293,17 @@ class UIState:
     show_move_analysis: bool = False
     tutorial: StrategyTutorial = field(default_factory=StrategyTutorial)
     analyzer: GameplayAnalyzer = field(default_factory=GameplayAnalyzer)
+    # New replay mode fields
+    replay_mode: bool = False
+    replay_index: int = 0
+    replay_playing: bool = False
+    replay_speed: float = 1.0  # Moves per second
+    replay_last_step: float = 0.0
+    # AI thinking indicator
+    ai_thinking: bool = False
+    ai_think_start: float = 0.0
+    # Move preview
+    hover_pos: Optional[Tuple[int, int]] = None
 
 
 class MenuSystem:
@@ -1263,6 +1333,8 @@ class MenuSystem:
             MenuItem("Redo Move", self.game.on_redo),
             MenuItem("Save Game", self.game.on_save),
             MenuItem("Load Game", self.game.on_load),
+            MenuItem("Export to PGN", self.game.on_export_pgn),
+            MenuItem("Export to JSON", self.game.on_export_json),
         ]
 
         # AI menu with submenu for difficulty levels
@@ -1289,6 +1361,10 @@ class MenuSystem:
                 None,
                 submenu=ai_level_submenu,
             ),
+            MenuItem(
+                f"Show Hints: {'On' if self.game.hint_system.show_hints else 'Off'}",
+                self.game.on_toggle_move_hints,
+            ),
         ]
 
         # View menu with submenu for themes
@@ -1313,6 +1389,27 @@ class MenuSystem:
                 THEMES["forest"]["display"],
                 lambda: self.game.set_theme("forest"),
             ),
+            MenuItem(
+                THEMES["colorblind_friendly"]["display"],
+                lambda: self.game.set_theme("colorblind_friendly"),
+            ),
+            MenuItem(
+                THEMES["high_contrast"]["display"],
+                lambda: self.game.set_theme("high_contrast"),
+            ),
+        ]
+
+        font_size_submenu = [
+            MenuItem("Small (0.8x)", lambda: self.game.set_font_size(0.8)),
+            MenuItem("Normal (1.0x)", lambda: self.game.set_font_size(1.0)),
+            MenuItem("Large (1.2x)", lambda: self.game.set_font_size(1.2)),
+            MenuItem("X-Large (1.5x)", lambda: self.game.set_font_size(1.5)),
+        ]
+
+        piece_style_submenu = [
+            MenuItem("Traditional", lambda: self.game.set_piece_style("traditional")),
+            MenuItem("Modern", lambda: self.game.set_piece_style("modern")),
+            MenuItem("Emoji", lambda: self.game.set_piece_style("emoji")),
         ]
 
         view_items = [
@@ -1322,8 +1419,22 @@ class MenuSystem:
                 submenu=theme_submenu,
             ),
             MenuItem(
-                f"Hints: {'On' if self.game.settings.hints else 'Off'}",
-                self.game.on_toggle_hints,
+                f"Font Size: {int(self.game.settings.font_size_multiplier * 100)}%",
+                None,
+                submenu=font_size_submenu,
+            ),
+            MenuItem(
+                f"Piece Style: {self.game.settings.piece_style.title()}",
+                None,
+                submenu=piece_style_submenu,
+            ),
+            MenuItem(
+                f"Grid: {'On' if self.game.settings.show_grid else 'Off'}",
+                self.game.on_toggle_grid,
+            ),
+            MenuItem(
+                f"Move Preview: {'On' if self.game.settings.show_move_preview else 'Off'}",
+                self.game.on_toggle_move_preview,
             ),
             MenuItem(
                 f"Sound: {'On' if self.game.settings.sound else 'Off'}",
@@ -1340,6 +1451,12 @@ class MenuSystem:
                 enabled=self.game.board.game_over(),
             ),
             MenuItem("Toggle Move Analysis", self.game.on_toggle_move_analysis),
+            MenuItem(
+                "Replay Mode",
+                self.game.on_toggle_replay,
+                enabled=len(self.game.ui.move_history) > 0,
+            ),
+            MenuItem("Per-Difficulty Stats", self.game.on_show_difficulty_stats),
             MenuItem("About Reversi Deluxe", self.game.on_show_about),
         ]
 
@@ -2344,6 +2461,472 @@ class GameAnalysisDisplay:
             self.scroll_y = max(0, self.scroll_y + direction * 3)
 
 
+class ReplayMode:
+    """Handle game replay mode with timeline scrubbing"""
+
+    def __init__(self, game):
+        self.game = game
+        self.font = pg.font.Font(None, 16)
+        self.title_font = pg.font.Font(None, 20)
+
+    def enter_replay_mode(self):
+        """Enter replay mode"""
+        if not self.game.ui.move_history:
+            self.game.ui.status = "No moves to replay"
+            return
+
+        self.game.ui.replay_mode = True
+        self.game.ui.replay_index = 0
+        self.game.ui.replay_playing = False
+        self.restore_board_state(0)
+        self.game.ui.status = "Replay mode - Use ◀/▶ or click timeline"
+
+    def exit_replay_mode(self):
+        """Exit replay mode and restore current board"""
+        self.game.ui.replay_mode = False
+        self.game.ui.replay_playing = False
+        # Restore current board by replaying all moves
+        if self.game.ui.move_history:
+            self.restore_board_state(len(self.game.ui.move_history))
+        self.game.ui.status = "Exited replay mode"
+
+    def restore_board_state(self, move_index: int):
+        """Restore board to a specific move index"""
+        # Reset board to initial state
+        self.game.board = Board(self.game.board.size)
+
+        # Replay moves up to the index
+        for i, entry in enumerate(self.game.ui.move_history[:move_index]):
+            legal = {
+                (m.row, m.col): m
+                for m in self.game.board.legal_moves(self.game.board.to_move)
+            }
+            mv = legal.get((entry.row, entry.col))
+            if mv:
+                self.game.board.make_move(mv)
+
+        self.game.ui.replay_index = move_index
+
+    def step_forward(self):
+        """Step one move forward in replay"""
+        if self.game.ui.replay_index < len(self.game.ui.move_history):
+            self.game.ui.replay_index += 1
+            self.restore_board_state(self.game.ui.replay_index)
+            self.update_status()
+
+    def step_backward(self):
+        """Step one move backward in replay"""
+        if self.game.ui.replay_index > 0:
+            self.game.ui.replay_index -= 1
+            self.restore_board_state(self.game.ui.replay_index)
+            self.update_status()
+
+    def toggle_play(self):
+        """Toggle play/pause in replay"""
+        self.game.ui.replay_playing = not self.game.ui.replay_playing
+        if self.game.ui.replay_playing:
+            self.game.ui.replay_last_step = time.time()
+
+    def update(self):
+        """Update replay playback"""
+        if self.game.ui.replay_playing and self.game.ui.replay_index < len(
+            self.game.ui.move_history
+        ):
+            now = time.time()
+            if now - self.game.ui.replay_last_step >= (1.0 / self.game.ui.replay_speed):
+                self.step_forward()
+                self.game.ui.replay_last_step = now
+                if self.game.ui.replay_index >= len(self.game.ui.move_history):
+                    self.game.ui.replay_playing = False
+
+    def update_status(self):
+        """Update status message for current replay position"""
+        total = len(self.game.ui.move_history)
+        current = self.game.ui.replay_index
+        if current < total:
+            entry = self.game.ui.move_history[current]
+            player = "Black" if entry.player == BLACK else "White"
+            self.game.ui.status = f"Replay: Move {current}/{total} - {player}'s turn"
+        else:
+            self.game.ui.status = f"Replay: End of game ({total} moves)"
+
+    def draw_timeline(self, screen, theme):
+        """Draw the replay timeline control"""
+        if not self.game.ui.replay_mode:
+            return
+
+        # Timeline bar at bottom
+        timeline_height = 80
+        timeline_rect = pg.Rect(
+            MARGIN, H - timeline_height - MARGIN, W - MARGIN * 2, timeline_height
+        )
+
+        # Background
+        pg.draw.rect(screen, theme["hud"], timeline_rect, border_radius=8)
+        pg.draw.rect(screen, theme["grid"], timeline_rect, 2, border_radius=8)
+
+        # Title
+        title = self.title_font.render("Game Replay", True, theme["text"])
+        screen.blit(title, (timeline_rect.x + 10, timeline_rect.y + 5))
+
+        # Timeline slider
+        slider_y = timeline_rect.y + 35
+        slider_start_x = timeline_rect.x + 100
+        slider_width = timeline_rect.width - 220
+        slider_height = 8
+
+        slider_rect = pg.Rect(slider_start_x, slider_y, slider_width, slider_height)
+
+        # Slider background
+        pg.draw.rect(screen, theme["grid"], slider_rect, border_radius=4)
+
+        # Progress bar
+        total_moves = len(self.game.ui.move_history)
+        if total_moves > 0:
+            progress = self.game.ui.replay_index / total_moves
+            progress_width = int(slider_width * progress)
+            progress_rect = pg.Rect(
+                slider_start_x, slider_y, progress_width, slider_height
+            )
+            pg.draw.rect(screen, theme["accent"], progress_rect, border_radius=4)
+
+            # Scrubber handle
+            handle_x = slider_start_x + progress_width
+            handle_rect = pg.Rect(handle_x - 6, slider_y - 4, 12, 16)
+            pg.draw.rect(screen, theme["accent"], handle_rect, border_radius=6)
+            pg.draw.rect(screen, theme["text"], handle_rect, 2, border_radius=6)
+
+        # Move counter
+        counter_text = f"{self.game.ui.replay_index} / {total_moves}"
+        counter = self.font.render(counter_text, True, theme["text"])
+        screen.blit(
+            counter,
+            (timeline_rect.right - counter.get_width() - 10, timeline_rect.y + 5),
+        )
+
+        # Controls
+        controls_y = slider_y + 20
+        button_width = 60
+        button_height = 24
+        button_spacing = 10
+
+        buttons = [
+            ("⏮", self.go_to_start, "Start"),
+            ("◀", self.step_backward, "Back"),
+            (
+                "⏯" if not self.game.ui.replay_playing else "⏸",
+                self.toggle_play,
+                "Play/Pause",
+            ),
+            ("▶", self.step_forward, "Forward"),
+            ("⏭", self.go_to_end, "End"),
+            ("✕", self.exit_replay_mode, "Exit"),
+        ]
+
+        start_x = (
+            timeline_rect.centerx
+            - ((button_width + button_spacing) * len(buttons) - button_spacing) // 2
+        )
+
+        mouse_pos = pg.mouse.get_pos()
+
+        for i, (icon, handler, tooltip) in enumerate(buttons):
+            btn_x = start_x + i * (button_width + button_spacing)
+            btn_rect = pg.Rect(btn_x, controls_y, button_width, button_height)
+
+            is_hover = btn_rect.collidepoint(mouse_pos)
+            btn_color = theme["accent"] if is_hover else theme["grid"]
+
+            pg.draw.rect(screen, btn_color, btn_rect, border_radius=4)
+            pg.draw.rect(screen, theme["text"], btn_rect, 1, border_radius=4)
+
+            # Button text
+            btn_text = self.font.render(icon, True, theme["text"])
+            text_rect = btn_text.get_rect(center=btn_rect.center)
+            screen.blit(btn_text, text_rect)
+
+    def go_to_start(self):
+        """Jump to start of game"""
+        self.game.ui.replay_index = 0
+        self.restore_board_state(0)
+        self.update_status()
+
+    def go_to_end(self):
+        """Jump to end of game"""
+        self.game.ui.replay_index = len(self.game.ui.move_history)
+        self.restore_board_state(self.game.ui.replay_index)
+        self.update_status()
+
+    def handle_timeline_click(self, pos: Tuple[int, int]) -> bool:
+        """Handle clicks on the timeline. Returns True if handled"""
+        if not self.game.ui.replay_mode:
+            return False
+
+        # Check timeline slider area
+        timeline_height = 80
+        timeline_rect = pg.Rect(
+            MARGIN, H - timeline_height - MARGIN, W - MARGIN * 2, timeline_height
+        )
+
+        if not timeline_rect.collidepoint(pos):
+            return False
+
+        # Check slider
+        slider_y = timeline_rect.y + 35
+        slider_start_x = timeline_rect.x + 100
+        slider_width = timeline_rect.width - 220
+        slider_height = 20  # Larger hit area
+
+        slider_rect = pg.Rect(slider_start_x, slider_y - 6, slider_width, slider_height)
+
+        if slider_rect.collidepoint(pos):
+            # Calculate clicked position
+            rel_x = pos[0] - slider_start_x
+            progress = max(0.0, min(1.0, rel_x / slider_width))
+            new_index = int(progress * len(self.game.ui.move_history))
+            self.game.ui.replay_index = new_index
+            self.restore_board_state(new_index)
+            self.update_status()
+            return True
+
+        # Check control buttons
+        controls_y = slider_y + 20
+        button_width = 60
+        button_height = 24
+        button_spacing = 10
+
+        buttons = [
+            self.go_to_start,
+            self.step_backward,
+            self.toggle_play,
+            self.step_forward,
+            self.go_to_end,
+            self.exit_replay_mode,
+        ]
+
+        start_x = (
+            timeline_rect.centerx
+            - ((button_width + button_spacing) * len(buttons) - button_spacing) // 2
+        )
+
+        for i, handler in enumerate(buttons):
+            btn_x = start_x + i * (button_width + button_spacing)
+            btn_rect = pg.Rect(btn_x, controls_y, button_width, button_height)
+
+            if btn_rect.collidepoint(pos):
+                handler()
+                return True
+
+        return True  # Consume click even if not on specific element
+
+
+class HintSystem:
+    """Provide move hints using AI analysis"""
+
+    def __init__(self, game):
+        self.game = game
+        self.font = pg.font.Font(None, 16)
+        self.hints = []
+        self.show_hints = False
+
+    def generate_hints(self):
+        """Generate top 3 move suggestions"""
+        if self.game.board.game_over():
+            self.hints = []
+            return
+
+        legal_moves = list(self.game.board.legal_moves(self.game.board.to_move))
+        if not legal_moves:
+            self.hints = []
+            return
+
+        # Use AI to evaluate each move
+        move_scores = []
+        for move in legal_moves:
+            board_copy = Board.deserialize(self.game.board.serialize())
+            board_copy.to_move = self.game.board.to_move
+            board_copy.make_move(move)
+
+            # Quick eval (depth 2 for speed)
+            score = -self.game.ai.search(
+                board_copy,
+                min(2, self.game.settings.ai_depth),
+                -float("inf"),
+                float("inf"),
+                OPP[self.game.board.to_move],
+            )
+            move_scores.append((score, move))
+
+        # Sort by score and take top 3
+        move_scores.sort(reverse=True, key=lambda x: x[0])
+        self.hints = [
+            {
+                "move": move,
+                "row": move.row,
+                "col": move.col,
+                "quality": self._score_to_quality(score, move_scores[0][0]),
+                "score": score,
+            }
+            for score, move in move_scores[:3]
+        ]
+
+    def _score_to_quality(self, score: float, best_score: float) -> str:
+        """Convert score to quality rating"""
+        if score >= best_score * 0.95:
+            return "Excellent"
+        elif score >= best_score * 0.8:
+            return "Good"
+        else:
+            return "Fair"
+
+    def toggle(self):
+        """Toggle hint display"""
+        self.show_hints = not self.show_hints
+        if self.show_hints:
+            self.generate_hints()
+            self.game.ui.status = "Hints enabled - Top moves highlighted"
+        else:
+            self.game.ui.status = "Hints disabled"
+
+    def draw_hints(self, screen, board_rect, cell, theme):
+        """Draw hint indicators on board"""
+        if not self.show_hints or not self.hints:
+            return
+
+        for i, hint in enumerate(self.hints):
+            row, col = hint["row"], hint["col"]
+            x = board_rect.x + col * cell + cell // 2
+            y = board_rect.y + row * cell + cell // 2
+
+            # Color based on quality
+            quality_colors = {
+                "Excellent": (100, 255, 100),
+                "Good": (100, 200, 255),
+                "Fair": (255, 200, 100),
+            }
+            color = quality_colors.get(hint["quality"], (255, 255, 255))
+
+            # Draw circle with number
+            radius = min(cell // 6, 15)
+            pg.draw.circle(screen, color, (x, y), radius)
+            pg.draw.circle(screen, theme["text"], (x, y), radius, 2)
+
+            # Draw rank number
+            rank_text = self.font.render(str(i + 1), True, theme["text"])
+            text_rect = rank_text.get_rect(center=(x, y))
+            screen.blit(rank_text, text_rect)
+
+
+class GameExporter:
+    """Export games to PGN/JSON formats"""
+
+    @staticmethod
+    def export_to_pgn(game) -> str:
+        """Export game to PGN format"""
+        pgn_lines = []
+
+        # Header
+        pgn_lines.append('[Event "Reversi Deluxe Game"]')
+        pgn_lines.append(f'[Date "{time.strftime("%Y.%m.%d")}"]')
+        pgn_lines.append('[Round "-"]')
+
+        black_player = "Computer" if game.settings.ai_black else "Human"
+        white_player = "Computer" if game.settings.ai_white else "Human"
+        pgn_lines.append(f'[Black "{black_player}"]')
+        pgn_lines.append(f'[White "{white_player}"]')
+
+        black_score, white_score = game.board.score()
+        if black_score > white_score:
+            result = "1-0"
+        elif white_score > black_score:
+            result = "0-1"
+        else:
+            result = "1/2-1/2"
+        pgn_lines.append(f'[Result "{result}"]')
+        pgn_lines.append(f'[BoardSize "{game.board.size}x{game.board.size}"]')
+        pgn_lines.append(f'[FinalScore "{black_score}-{white_score}"]')
+        pgn_lines.append("")
+
+        # Moves
+        moves = []
+        for i, entry in enumerate(game.ui.move_history):
+            move_notation = f"{chr(97 + entry.col)}{entry.row + 1}"
+            if i % 2 == 0:
+                moves.append(f"{i//2 + 1}. {move_notation}")
+            else:
+                moves[-1] += f" {move_notation}"
+
+        # Wrap moves at reasonable length
+        move_text = " ".join(moves) + f" {result}"
+        pgn_lines.append(move_text)
+
+        return "\n".join(pgn_lines)
+
+    @staticmethod
+    def export_to_json(game) -> str:
+        """Export game to JSON format"""
+        export_data = {
+            "metadata": {
+                "date": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "board_size": game.board.size,
+                "black_player": "Computer" if game.settings.ai_black else "Human",
+                "white_player": "Computer" if game.settings.ai_white else "Human",
+                "ai_depth": game.settings.ai_depth,
+                "theme": game.settings.theme,
+            },
+            "moves": [
+                {
+                    "move_number": entry.move_number,
+                    "player": "Black" if entry.player == BLACK else "White",
+                    "position": f"{chr(97 + entry.col)}{entry.row + 1}",
+                    "row": entry.row,
+                    "col": entry.col,
+                    "pieces_flipped": entry.pieces_flipped,
+                    "timestamp": (
+                        entry.timestamp if hasattr(entry, "timestamp") else None
+                    ),
+                }
+                for entry in game.ui.move_history
+            ],
+            "result": {
+                "black_score": game.board.score()[0],
+                "white_score": game.board.score()[1],
+                "winner": (
+                    "Black"
+                    if game.board.score()[0] > game.board.score()[1]
+                    else (
+                        "White"
+                        if game.board.score()[1] > game.board.score()[0]
+                        else "Draw"
+                    )
+                ),
+            },
+        }
+
+        return json.dumps(export_data, indent=2)
+
+    @staticmethod
+    def save_game(game, format_type: str = "pgn"):
+        """Save game to file"""
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+
+        if format_type == "pgn":
+            filename = f"reversi_game_{timestamp}.pgn"
+            content = GameExporter.export_to_pgn(game)
+        else:  # json
+            filename = f"reversi_game_{timestamp}.json"
+            content = GameExporter.export_to_json(game)
+
+        try:
+            with open(filename, "w") as f:
+                f.write(content)
+            game.ui.status = f"Game exported to {filename}"
+            return filename
+        except Exception as e:
+            game.ui.status = f"Export failed: {e}"
+            return None
+
+
 class Game:
     def __init__(self, board: Board, settings: Settings):
         pg.init()
@@ -2363,6 +2946,10 @@ class Game:
         self.gameplay_analyzer = GameplayAnalyzer()
         self.game_analysis = GameAnalysisDisplay(self)
         self.move_analysis = MoveAnalysisDisplay(self)
+        # New enhancement systems
+        self.replay_mode = ReplayMode(self)
+        self.hint_system = HintSystem(self)
+        self.exporter = GameExporter()
         self.ensure_icon()
         self.wood_cache = None
         self.disc_cache = {}  # Cache for pre-rendered discs
@@ -2456,6 +3043,14 @@ class Game:
 
         # Draw move analysis overlay
         self.move_analysis.draw(self.screen, theme)
+
+        # Draw AI thinking indicator
+        if self.ui.ai_thinking:
+            self.draw_ai_thinking_indicator(theme)
+
+        # Draw replay mode timeline
+        if self.ui.replay_mode:
+            self.replay_mode.draw_timeline(self.screen, theme)
 
         # Draw dropdown menus on top of everything (must be last)
         self.menu_system.draw_dropdown_overlay(self.screen, theme)
@@ -2628,8 +3223,14 @@ class Game:
         hover = self.xy_to_rc(mouse, board_rect, cell)
         legal = {(m.row, m.col): m for m in self.board.legal_moves(self.board.to_move)}
 
-        # Hints
-        if self.settings.hints:
+        # Store hover position for move preview
+        self.ui.hover_pos = hover if hover in legal else None
+
+        # Hints from AI system (top 3 moves with quality)
+        if self.hint_system.show_hints:
+            self.hint_system.draw_hints(self.screen, board_rect, cell, theme)
+        elif self.settings.hints:
+            # Standard hints (all legal moves)
             self.draw_hints(board_rect, cell, legal)
 
         # Tutorial highlighting
@@ -2650,9 +3251,12 @@ class Game:
                         inner_rect = rect.inflate(-6, -6)
                         pg.draw.rect(self.screen, (255, 255, 100, 40), inner_rect)
 
-        # Hover effect
+        # Hover effect and move preview
         if hover and hover in legal:
             self.draw_hover_effect(board_rect, cell, hover)
+            # Show piece preview
+            if self.settings.show_move_preview and not self.ui.replay_mode:
+                self.draw_move_preview(board_rect, cell, hover)
 
     def draw_hints(self, board_rect, cell, legal_moves):
         """Draw elegant hint indicators for legal moves"""
@@ -2699,6 +3303,82 @@ class Game:
 
         for x, y in corners:
             pg.draw.circle(self.screen, (220, 220, 220), (x, y), dot_size)
+
+    def draw_move_preview(self, board_rect, cell, hover_pos):
+        """Draw semi-transparent piece preview at hover position"""
+        r, c = hover_pos
+        center_x = board_rect.left + c * cell + cell // 2
+        center_y = board_rect.top + r * cell + cell // 2
+        radius = int(cell * DISC_SIZE_RATIO)
+
+        # Draw semi-transparent preview piece
+        preview_surf = pg.Surface((radius * 2 + 10, radius * 2 + 10), pg.SRCALPHA)
+        preview_center = (radius + 5, radius + 5)
+
+        # Determine piece color
+        if self.board.to_move == BLACK:
+            color = (*BLACK_DISC_BASE, 128)  # Semi-transparent black
+        else:
+            color = (*WHITE_DISC_BASE, 128)  # Semi-transparent white
+
+        pg.draw.circle(preview_surf, color, preview_center, radius)
+        pg.draw.circle(preview_surf, (100, 100, 100, 128), preview_center, radius, 2)
+
+        # Blit to screen
+        self.screen.blit(preview_surf, (center_x - radius - 5, center_y - radius - 5))
+
+    def draw_ai_thinking_indicator(self, theme):
+        """Draw spinner/progress indicator when AI is thinking"""
+        # Small spinner in top right corner
+        spinner_x = self.screen.get_width() - 50
+        spinner_y = HUD_HEIGHT // 2
+        spinner_radius = 15
+
+        # Calculate rotation based on time
+        elapsed = time.time() - self.ui.ai_think_start
+        angle = (elapsed * 3) % (2 * math.pi)
+
+        # Draw spinner circle
+        pg.draw.circle(
+            self.screen, theme["grid"], (spinner_x, spinner_y), spinner_radius, 3
+        )
+
+        # Draw rotating arc
+        arc_rect = pg.Rect(
+            spinner_x - spinner_radius,
+            spinner_y - spinner_radius,
+            spinner_radius * 2,
+            spinner_radius * 2,
+        )
+
+        # Draw arc segments
+        num_segments = 8
+        for i in range(num_segments):
+            segment_angle = angle + (i * 2 * math.pi / num_segments)
+            alpha = int(255 * (1 - i / num_segments))
+
+            end_x = spinner_x + int(spinner_radius * 0.7 * math.cos(segment_angle))
+            end_y = spinner_y + int(spinner_radius * 0.7 * math.sin(segment_angle))
+
+            color = (
+                (*theme["accent"][:3], alpha)
+                if len(theme["accent"]) == 3
+                else theme["accent"]
+            )
+            if len(color) == 4:
+                # Draw with alpha
+                dot_surf = pg.Surface((6, 6), pg.SRCALPHA)
+                pg.draw.circle(dot_surf, color, (3, 3), 3)
+                self.screen.blit(dot_surf, (end_x - 3, end_y - 3))
+            else:
+                pg.draw.circle(self.screen, color, (end_x, end_y), 3)
+
+        # "AI thinking..." text
+        text = self.font.render("AI thinking...", True, theme["text"])
+        self.screen.blit(
+            text,
+            (spinner_x - text.get_width() - 25, spinner_y - text.get_height() // 2),
+        )
 
     def draw_wood_bg(self):
         # Refined procedural wood background (cached for performance)
@@ -3295,9 +3975,17 @@ class Game:
         if (self.board.to_move == BLACK and self.settings.ai_black) or (
             self.board.to_move == WHITE and self.settings.ai_white
         ):
+            # Start thinking indicator
+            self.ui.ai_thinking = True
+            self.ui.ai_think_start = time.time()
             self.ui.status = f"{NAME[self.board.to_move]} (Computer) thinking…"
             pg.display.flip()
+
             mv = self.ai.choose(self.board, self.board.to_move)
+
+            # Stop thinking indicator
+            self.ui.ai_thinking = False
+
             if mv:
                 self.play(mv.row, mv.col)
             else:
@@ -3530,6 +4218,16 @@ class Game:
         if not self.settings.stats:
             self.settings.stats = PlayerStats()
         self.settings.stats.add_game_result(result)
+
+        # Also update per-difficulty stats
+        if self.settings.per_difficulty_stats is None:
+            self.settings.per_difficulty_stats = {}
+
+        current_depth = self.settings.ai_depth
+        if current_depth not in self.settings.per_difficulty_stats:
+            self.settings.per_difficulty_stats[current_depth] = PlayerStats()
+
+        self.settings.per_difficulty_stats[current_depth].add_game_result(result)
         self.settings.save()
 
     def on_new(self):
@@ -3731,6 +4429,181 @@ class Game:
 
         self.ui.status = "About dialog closed"
 
+    # New enhancement handlers
+    def on_toggle_replay(self):
+        """Toggle replay mode"""
+        if self.ui.replay_mode:
+            self.replay_mode.exit_replay_mode()
+        else:
+            self.replay_mode.enter_replay_mode()
+        self.menu_system.setup_menus()  # Refresh menu
+
+    def on_toggle_move_hints(self):
+        """Toggle move hints display"""
+        self.hint_system.toggle()
+        self.menu_system.setup_menus()  # Refresh menu
+
+    def on_export_pgn(self):
+        """Export game to PGN format"""
+        filename = self.exporter.save_game(self, format_type="pgn")
+        if filename:
+            self.ui.status = f"Exported to {filename}"
+
+    def on_export_json(self):
+        """Export game to JSON format"""
+        filename = self.exporter.save_game(self, format_type="json")
+        if filename:
+            self.ui.status = f"Exported to {filename}"
+
+    def on_show_difficulty_stats(self):
+        """Show per-difficulty statistics"""
+        if not self.settings.per_difficulty_stats:
+            self.ui.status = "No difficulty stats available yet"
+            return
+
+        # Create a modal dialog showing stats for each difficulty
+        import pygame as pg
+
+        theme = THEMES[self.settings.theme]
+        screen_w, screen_h = self.screen.get_size()
+
+        # Dialog dimensions
+        dialog_w = 500
+        dialog_h = 450
+        dialog_x = (screen_w - dialog_w) // 2
+        dialog_y = (screen_h - dialog_h) // 2
+
+        font = pg.font.SysFont("Arial", 14)
+        title_font = pg.font.SysFont("Arial", 18, bold=True)
+
+        background = self.screen.copy()
+
+        showing_stats = True
+        scroll_y = 0
+
+        while showing_stats:
+            for ev in pg.event.get():
+                if ev.type == pg.QUIT:
+                    return
+                if ev.type == pg.KEYDOWN and ev.key == pg.K_ESCAPE:
+                    showing_stats = False
+                if ev.type == pg.MOUSEBUTTONDOWN:
+                    dialog_rect = pg.Rect(dialog_x, dialog_y, dialog_w, dialog_h)
+                    if not dialog_rect.collidepoint(ev.pos):
+                        showing_stats = False
+                if ev.type == pg.MOUSEWHEEL:
+                    scroll_y = max(0, scroll_y - ev.y * 20)
+
+            self.screen.blit(background, (0, 0))
+
+            # Overlay
+            overlay = pg.Surface(self.screen.get_size(), pg.SRCALPHA)
+            overlay.fill((0, 0, 0, 160))
+            self.screen.blit(overlay, (0, 0))
+
+            # Dialog background
+            dialog_rect = pg.Rect(dialog_x, dialog_y, dialog_w, dialog_h)
+            pg.draw.rect(self.screen, theme["hud"], dialog_rect, border_radius=10)
+            pg.draw.rect(self.screen, theme["accent"], dialog_rect, 3, border_radius=10)
+
+            # Title
+            title = title_font.render("Per-Difficulty Statistics", True, theme["text"])
+            self.screen.blit(title, (dialog_x + 20, dialog_y + 15))
+
+            # Stats content
+            y = dialog_y + 50 - scroll_y
+            line_height = 20
+
+            difficulty_names = {
+                1: "Beginner",
+                2: "Easy",
+                3: "Medium",
+                4: "Hard",
+                5: "Expert",
+                6: "Master",
+            }
+
+            for depth in range(1, 7):
+                if depth not in self.settings.per_difficulty_stats:
+                    continue
+
+                stats = self.settings.per_difficulty_stats[depth]
+
+                if y > dialog_y + 40 and y < dialog_y + dialog_h - 40:
+                    # Difficulty header
+                    header = title_font.render(
+                        f"Level {depth} - {difficulty_names[depth]}",
+                        True,
+                        theme["accent"],
+                    )
+                    self.screen.blit(header, (dialog_x + 20, y))
+
+                y += line_height + 5
+
+                # Stats lines
+                stat_lines = [
+                    f"  Games played: {stats.games_played}",
+                    (
+                        f"  Win rate: {stats.win_rate:.1%}"
+                        if stats.games_played > 0
+                        else "  Win rate: N/A"
+                    ),
+                    f"  Wins: {stats.games_won} | Losses: {stats.games_lost} | Ties: {stats.games_tied}",
+                ]
+
+                for line in stat_lines:
+                    if y > dialog_y + 40 and y < dialog_y + dialog_h - 40:
+                        text_surf = font.render(line, True, theme["text"])
+                        self.screen.blit(text_surf, (dialog_x + 20, y))
+                    y += line_height
+
+                y += 10  # Space between difficulties
+
+            # Close hint
+            hint = font.render(
+                "Press ESC or click outside to close", True, theme["text"]
+            )
+            self.screen.blit(hint, (dialog_x + 20, dialog_y + dialog_h - 30))
+
+            pg.display.flip()
+            self.clock.tick(60)
+
+        self.ui.status = "Stats dialog closed"
+
+    def set_font_size(self, multiplier: float):
+        """Set font size multiplier"""
+        self.settings.font_size_multiplier = multiplier
+        # Reinitialize fonts with new size
+        base_size = int(18 * multiplier)
+        big_size = int(24 * multiplier)
+        self.font = pg.font.SysFont("Arial", base_size)
+        self.big_font = pg.font.SysFont("Arial", big_size)
+        self.settings.save()
+        self.menu_system.setup_menus()
+        self.ui.status = f"Font size set to {int(multiplier * 100)}%"
+
+    def set_piece_style(self, style: str):
+        """Set piece style"""
+        self.settings.piece_style = style
+        self.disc_cache.clear()  # Clear cache to force redraw
+        self.settings.save()
+        self.menu_system.setup_menus()
+        self.ui.status = f"Piece style: {style.title()}"
+
+    def on_toggle_grid(self):
+        """Toggle grid display"""
+        self.settings.show_grid = not self.settings.show_grid
+        self.settings.save()
+        self.menu_system.setup_menus()
+        self.ui.status = f"Grid {'enabled' if self.settings.show_grid else 'disabled'}"
+
+    def on_toggle_move_preview(self):
+        """Toggle move preview"""
+        self.settings.show_move_preview = not self.settings.show_move_preview
+        self.settings.save()
+        self.menu_system.setup_menus()
+        self.ui.status = f"Move preview {'enabled' if self.settings.show_move_preview else 'disabled'}"
+
     def on_make_desktop(self):
         try:
             path = os.path.expanduser(
@@ -3773,6 +4646,10 @@ Comment=Classic Reversi/Othello board game with AI
         while True:
             dt = self.clock.tick(60)
 
+            # Update replay mode if active
+            if self.ui.replay_mode:
+                self.replay_mode.update()
+
             # Check for game over state change to auto-show analysis
             current_game_over = self.board.game_over()
             if current_game_over and not self.was_game_over:
@@ -3790,6 +4667,11 @@ Comment=Classic Reversi/Othello board game with AI
                     self.screen = pg.display.set_mode((ev.w, ev.h), pg.RESIZABLE)
                     self.clear_disc_cache()  # Clear cache when window resizes
                 if ev.type == pg.MOUSEBUTTONDOWN and ev.button == 1:
+                    # Check replay mode timeline first
+                    if self.ui.replay_mode:
+                        if self.replay_mode.handle_timeline_click(ev.pos):
+                            continue
+
                     # Check selection dialog first (highest priority)
                     if self.selection_dialog.handle_click(ev.pos):
                         continue
@@ -3802,18 +4684,21 @@ Comment=Classic Reversi/Othello board game with AI
                     if self.move_analysis.handle_click(ev.pos):
                         continue
 
-                    # Finally check board clicks
-                    board_rect, _, cell = self.layout()
-                    rc = self.xy_to_rc(ev.pos, board_rect, cell)
-                    if rc and not self.board.game_over():
-                        # Only allow human moves if current player is human
-                        current_is_ai = (
-                            self.board.to_move == BLACK and self.settings.ai_black
-                        ) or (self.board.to_move == WHITE and self.settings.ai_white)
-                        if not current_is_ai:
-                            if self.play(*rc):
-                                self.maybe_pass()
-                                ai_timer = 0  # Reset AI timer after human move
+                    # Finally check board clicks (not in replay mode)
+                    if not self.ui.replay_mode:
+                        board_rect, _, cell = self.layout()
+                        rc = self.xy_to_rc(ev.pos, board_rect, cell)
+                        if rc and not self.board.game_over():
+                            # Only allow human moves if current player is human
+                            current_is_ai = (
+                                self.board.to_move == BLACK and self.settings.ai_black
+                            ) or (
+                                self.board.to_move == WHITE and self.settings.ai_white
+                            )
+                            if not current_is_ai:
+                                if self.play(*rc):
+                                    self.maybe_pass()
+                                    ai_timer = 0  # Reset AI timer after human move
 
                 # Handle mouse wheel for scrolling in analysis
                 if ev.type == pg.MOUSEWHEEL:
@@ -3826,6 +4711,27 @@ Comment=Classic Reversi/Othello board game with AI
                             -ev.y
                         )  # Negative for natural scrolling
                 if ev.type == pg.KEYDOWN:
+                    # Handle replay mode keys
+                    if self.ui.replay_mode:
+                        if ev.key == pg.K_LEFT:
+                            self.replay_mode.step_backward()
+                            continue
+                        elif ev.key == pg.K_RIGHT:
+                            self.replay_mode.step_forward()
+                            continue
+                        elif ev.key == pg.K_SPACE:
+                            self.replay_mode.toggle_play()
+                            continue
+                        elif ev.key == pg.K_HOME:
+                            self.replay_mode.go_to_start()
+                            continue
+                        elif ev.key == pg.K_END:
+                            self.replay_mode.go_to_end()
+                            continue
+                        elif ev.key == pg.K_ESCAPE:
+                            self.replay_mode.exit_replay_mode()
+                            continue
+
                     # Give selection dialog first priority
                     if self.selection_dialog.handle_keyboard(ev.key):
                         continue
@@ -3857,6 +4763,12 @@ Comment=Classic Reversi/Othello board game with AI
                         self.on_load()
                     elif ev.key == pg.K_m:
                         self.on_toggle_sound()
+                    elif ev.key == pg.K_p:
+                        # Toggle replay mode
+                        self.on_toggle_replay()
+                    elif ev.key == pg.K_i:
+                        # Toggle hint system
+                        self.on_toggle_move_hints()
                     elif ev.key == pg.K_g:
                         if self.board.game_over():
                             if self.game_analysis.active:
@@ -3881,8 +4793,8 @@ Comment=Classic Reversi/Othello board game with AI
                             self.ui.show_tutorial = False
                             self.ui.status = "Tutorial closed"
 
-            # Handle AI automation
-            if not self.board.game_over():
+            # Handle AI automation (not in replay mode)
+            if not self.board.game_over() and not self.ui.replay_mode:
                 current_is_ai = (
                     self.board.to_move == BLACK and self.settings.ai_black
                 ) or (self.board.to_move == WHITE and self.settings.ai_white)
