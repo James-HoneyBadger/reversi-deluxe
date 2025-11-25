@@ -1,54 +1,88 @@
-# Iago Deluxe
+# Iago Deluxe - Clean Edition
 
-Iago Deluxe is a feature-rich, professionally-crafted implementation of the classic Reversi (Othello) board game with an intelligent AI opponent and comprehensive game analysis.
+A clean, simple, and working implementation of the classic Reversi (Othello) board game.
 
 ## ✨ Features
 
-### 🎮 Gameplay
-- **Classic Reversi/Othello** gameplay with authentic rules
-- **6 AI Difficulty Levels** - From beginner-friendly to expert challenge
-- **Configurable Board Sizes** - 4x4 to 16x16 (default 8x8)
-- **Move Hints & Preview** - Visual indicators for legal moves and outcomes
-- **Undo/Redo System** - Full move history with unlimited undo/redo
-- **Interactive Tutorial** - Step-by-step guide for new players
+- **Clean Codebase** - Simple, readable Python code
+- **Working AI** - Intelligent computer opponent with 3 difficulty levels
+- **Beautiful Graphics** - Smooth pygame graphics with checkerboard board
+- **Move Validation** - Clear indicators for legal moves
+- **Score Tracking** - Real-time score display
+- **Game Over Detection** - Proper win/loss/draw detection
 
-### 🎨 Customization
-- **5 Beautiful Themes** - Classic, Ocean, Sunset, Midnight, Forest
-- **Traditional Checker Pieces** - Authentic disc rendering with smooth animations
-- **Sound Effects** - Satisfying audio feedback (toggleable)
-- **Responsive UI** - Clean, modern interface with hover effects
+## 🎮 How to Play
 
-### 📊 Analysis & Statistics
-- **Post-Game Analysis** - Detailed breakdown of game performance
-- **Move-by-Move Analysis** - Real-time evaluation of move quality
-- **Strategic Insights** - Board control, corner capture, edge play metrics
-- **Performance Tracking** - Win/loss records per difficulty level
+1. **Black moves first** - Click on any highlighted blue circle to place a piece
+2. **Capture opponent pieces** - Pieces are flipped when surrounded
+3. **Control the board** - The player with more pieces at the end wins
+4. **No moves?** - Turn passes to the other player
 
-### 💾 Data Management
-- **Game Save/Load** - Continue games anytime with PGN/JSON export
-- **Settings Persistence** - Your preferences saved automatically
-- **Game History** - Review past games with full move notation
+### Controls
+- **Mouse Click** - Place piece on valid squares
+- **R** - Reset game
+- **H** - Toggle move hints
+- **ESC** - Quit game
 
 ## 🚀 Quick Start
 
-### Installation
+### Requirements
+- Python 3.6+
+- pygame
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/James-HoneyBadger/Iago_Deluxe.git
-   cd Iago_Deluxe
-   ```
+### Installation & Running
 
-2. **Run the setup script:**
-   ```bash
-   ./setup.sh
-   ```
-   This creates a virtual environment and installs all dependencies automatically.
-
-### Running the Game
-
-**Recommended (using helper script):**
 ```bash
+# Install dependencies
+pip install pygame
+
+# Run the game
+python3 main.py
+```
+
+Or use the provided launcher:
+```bash
+./play.sh
+```
+
+## 🎯 Game Rules
+
+Reversi (also known as Othello) is played on an 8x8 board with 64 discs. Players take turns placing discs on the board with their color facing up.
+
+- **Objective**: Have more discs of your color than your opponent when the board is full
+- **Valid Moves**: You can only place a disc if it captures at least one opponent disc
+- **Capturing**: When you place a disc, all opponent discs between your new disc and another of your discs are flipped to your color
+- **Game End**: Game ends when neither player can make a valid move
+
+## 🤖 AI Difficulty
+
+- **Easy (1)** - Random moves
+- **Medium (2)** - Prefers corners and edges
+- **Hard (3)** - Uses minimax algorithm
+
+## 📁 Project Structure
+
+```
+Iago_Deluxe/
+├── main.py          # Main game file
+├── requirements.txt # Dependencies
+├── play.sh         # Launcher script
+├── setup.sh        # Setup script
+└── README.md       # This file
+```
+
+## 🔧 Development
+
+The entire game is contained in a single `main.py` file for simplicity and clarity. The code is well-commented and easy to understand.
+
+### Key Classes
+- `Board` - Game board logic and move validation
+- `AI` - Computer opponent with different difficulty levels
+- `Game` - Main game loop and user interface
+
+## 📝 License
+
+This project is open source and available under the MIT License.
 ./play.sh
 ```
 

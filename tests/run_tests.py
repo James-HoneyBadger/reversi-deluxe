@@ -1,91 +1,66 @@
 #!/usr/bin/env python3
 """
-Test runner for Reversi Deluxe
-Runs all unit tests and generates coverage report
+Test runner for Iago Deluxe
 """
+
 import sys
 import os
-import unittest
+import subprocess
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
-def run_tests(verbosity_level=2):
-    """
-    Run all tests in the tests directory
-
-    Args:
-        verbosity_level: Verbosity level (0=quiet, 1=normal, 2=verbose)
-
-    Returns:
-        True if all tests passed, False otherwise
-    """
-    # Discover and run tests
-    loader = unittest.TestLoader()
-    start_dir = os.path.dirname(os.path.abspath(__file__))
-    suite = loader.discover(start_dir, pattern="test_*.py")
-
-    runner = unittest.TextTestRunner(verbosity=verbosity_level)
-    result = runner.run(suite)
-
-    # Print summary
-    print("\n" + "=" * 70)
-    print("TEST SUMMARY")
-    print("=" * 70)
-    print(f"Tests run: {result.testsRun}")
-    print(f"Failures: {len(result.failures)}")
-    print(f"Errors: {len(result.errors)}")
-    print(f"Skipped: {len(result.skipped)}")
-
-    if result.wasSuccessful():
-        print("\n✓ All tests passed!")
-        return True
-    print("\n✗ Some tests failed")
-    return False
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
-def run_specific_test(test_module, verbosity_level=2):
-    """
-    Run tests from a specific module
+def run_tests():
+    """Run all tests"""
+    test_dir = os.path.dirname(__file__)
 
-    Args:
-        test_module: Module name (e.g., 'test_board')
-        verbosity_level: Verbosity level
-    """
-    loader = unittest.TestLoader()
-    suite = loader.loadTestsFromName(test_module)
+    # Find all test files
+    test_files = []
+    for file in os.listdir(test_dir):
+        if file.startswith("test_") and file.endswith(".py"):
+            test_files.append(os.path.join(test_dir, file))
 
-    runner = unittest.TextTestRunner(verbosity=verbosity_level)
-    result = runner.run(suite)
+    print(f"Running {len(test_files)} test files...")
 
-    return result.wasSuccessful()
+    passed = 0
+    failed = 0
+
+    for test_file in test_files:
+        print(f"\nRunning {os.path.basename(test_file)}...")
+        try:
+            # Import and run the test module
+            module_name = os.path.basename(test_file)[:-3]  # Remove .py
+            spec = importlib.util.spec_from_file_location(module_name, test_file)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # Run test functions
+            test_functions = [
+                getattr(module, name)
+                for name in dir(module)
+                if name.startswith("test_") and callable(getattr(module, name))
+            ]
+
+            for test_func in test_functions:
+                try:
+                    test_func()
+                    print(f"  ✓ {test_func.__name__}")
+                    passed += 1
+                except Exception as e:
+                    print(f"  ✗ {test_func.__name__}: {e}")
+                    failed += 1
+
+        except Exception as e:
+            print(f"  Error loading {test_file}: {e}")
+            failed += 1
+
+    print(f"\nResults: {passed} passed, {failed} failed")
+    return failed == 0
 
 
 if __name__ == "__main__":
-    import argparse
+    import importlib.util
 
-    parser = argparse.ArgumentParser(description="Run Reversi Deluxe tests")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
-    parser.add_argument("-q", "--quiet", action="store_true", help="Quiet output")
-    parser.add_argument(
-        "-m", "--module", help="Run specific test module (e.g., test_board)"
-    )
-
-    args = parser.parse_args()
-
-    # Determine verbosity
-    if args.quiet:
-        verbosity = 0  # noqa: C0103
-    elif args.verbose:
-        verbosity = 2  # noqa: C0103
-    else:
-        verbosity = 1  # noqa: C0103
-
-    # Run tests
-    if args.module:
-        success = run_specific_test(args.module, verbosity)  # noqa: C0103
-    else:
-        success = run_tests(verbosity)  # noqa: C0103
-
+    success = run_tests()
     sys.exit(0 if success else 1)
