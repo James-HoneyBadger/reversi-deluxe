@@ -4,11 +4,14 @@ Detailed AI Level Verification Report
 Tests all 6 difficulty levels with multiple scenarios
 """
 import sys
-
-sys.path.insert(0, "/home/james/HB_Reversi")
-
-from src.Reversi import AI, Board, BLACK, WHITE
 import time
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src.Reversi import AI, Board, BLACK  # noqa: E402
 
 
 def test_level_performance(level, num_tests=3):
@@ -22,7 +25,7 @@ def test_level_performance(level, num_tests=3):
     for _ in range(num_tests):
         ai.nodes_searched = 0
         start = time.time()
-        move = ai.choose(board, BLACK)
+        ai.choose(board, BLACK)
         elapsed = time.time() - start
 
         total_nodes += ai.nodes_searched

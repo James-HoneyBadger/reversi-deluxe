@@ -339,7 +339,7 @@ python3 tests/test_ai_levels.py -v
 ## 📚 File Structure Reference
 
 ```
-HB_Reversi/
+Iago_Deluxe/
 ├── main.py                     # Entry point
 ├── play.sh                     # Launcher script
 ├── setup.sh                    # Setup script

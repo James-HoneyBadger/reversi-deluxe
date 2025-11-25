@@ -2,11 +2,9 @@
 """
 Test script to verify AI difficulty levels 1-6 function differently
 """
-import sys
+import tests._helpers  # noqa: F401  # pylint: disable=unused-import
 
-sys.path.insert(0, "/home/james/HB_Reversi")
-
-from src.Reversi import AI, Board, BLACK, WHITE
+from src.Reversi import AI, Board, BLACK
 
 
 def test_ai_levels():
@@ -64,7 +62,8 @@ def test_ai_levels():
     for i in range(1, 6):
         if nodes[i] <= nodes[i - 1] * 0.5:  # Allow some variance
             print(
-                f"⚠️  Warning: Level {i+1} didn't search significantly more than Level {i}"
+                "⚠️  Warning: Level "
+                f"{i+1} didn't search significantly more than Level {i}"
             )
             increasing = False
 

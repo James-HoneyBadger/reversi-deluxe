@@ -1,6 +1,6 @@
-# HB_Reversi Documentation
+# Iago Deluxe Documentation
 
-Welcome to the comprehensive documentation for HB_Reversi, a feature-rich implementation of the classic Reversi (Othello) board game.
+Welcome to the comprehensive documentation for Iago Deluxe, a feature-rich implementation of the classic Reversi (Othello) board game.
 
 ## 📚 Documentation Index
 
@@ -44,7 +44,7 @@ Welcome to the comprehensive documentation for HB_Reversi, a feature-rich implem
 ## 📁 Project Structure
 
 ```
-HB_Reversi/
+Iago_Deluxe/
 ├── README.md                    # Main project documentation
 ├── CONTRIBUTING.md              # How to contribute
 │
@@ -100,8 +100,8 @@ HB_Reversi/
 
 ### Installation
 ```bash
-git clone https://github.com/James-HoneyBadger/HB_Reversi.git
-cd HB_Reversi
+git clone https://github.com/James-HoneyBadger/Iago_Deluxe.git
+cd Iago_Deluxe
 ./setup.sh
 ```
 
@@ -209,8 +209,8 @@ We welcome contributions! Please see:
 
 ## 📧 Support
 
-- **Issues:** [GitHub Issues](https://github.com/James-HoneyBadger/HB_Reversi/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/James-HoneyBadger/HB_Reversi/discussions)
+- **Issues:** [GitHub Issues](https://github.com/James-HoneyBadger/Iago_Deluxe/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/James-HoneyBadger/Iago_Deluxe/discussions)
 - **Email:** See repository for contact information
 
 ## 📄 License
@@ -221,4 +221,4 @@ This project is licensed under the terms in the [LICENSE](../LICENSE) file.
 
 **Version:** 2.0.0  
 **Last Updated:** November 19, 2025  
-**Repository:** [https://github.com/James-HoneyBadger/HB_Reversi](https://github.com/James-HoneyBadger/HB_Reversi)
+**Repository:** [https://github.com/James-HoneyBadger/Iago_Deluxe](https://github.com/James-HoneyBadger/Iago_Deluxe)

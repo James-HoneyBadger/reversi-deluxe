@@ -1,4 +1,4 @@
-# HB_Reversi - Improvements & Enhancement History
+# Iago Deluxe - Improvements & Enhancement History
 
 **Version:** 2.0.0  
 **Last Updated:** November 19, 2025
@@ -15,7 +15,7 @@
 
 ## Overview
 
-This document chronicles the evolution of HB_Reversi from a monolithic single-file implementation to a professional, modular game application. Version 2.0 represents a complete architectural refactoring while maintaining 100% backward compatibility.
+This document chronicles the evolution of Iago Deluxe from a monolithic single-file implementation to a professional, modular game application. Version 2.0 represents a complete architectural refactoring while maintaining 100% backward compatibility.
 
 ### Improvement Philosophy
 
@@ -54,7 +54,7 @@ Transformed from flat structure to professional layout:
 
 **Before (v1.0):**
 ```
-HB_Reversi/
+Iago_Deluxe/
 ├── Reversi.py              (4,800 lines - everything in one file!)
 ├── requirements.txt
 └── README.md
@@ -62,7 +62,7 @@ HB_Reversi/
 
 **After (v2.0):**
 ```
-HB_Reversi/
+Iago_Deluxe/
 ├── src/                    # Source code package
 │   ├── Reversi.py         # Main game (5,100 lines)
 │   ├── config.py          # Configuration (164 lines)
@@ -412,7 +412,7 @@ logger = get_logger(__name__)
 **Normal Game Session:**
 ```log
 2025-11-19 14:30:15,123 - src.Reversi - INFO - ================================
-2025-11-19 14:30:15,124 - src.Reversi - INFO - HB_Reversi v2.0 starting
+2025-11-19 14:30:15,124 - src.Reversi - INFO - Iago Deluxe v2.0 starting
 2025-11-19 14:30:15,125 - src.Reversi - INFO - Python 3.13.7, Pygame 2.6.1
 2025-11-19 14:30:15,126 - src.Reversi - DEBUG - Board size: 8×8
 2025-11-19 14:30:15,127 - src.Reversi - DEBUG - AI difficulty: Level 4
@@ -812,7 +812,7 @@ Options:
 ```bash
 $ ./play.sh --help
 
-HB_Reversi - Classic Reversi/Othello Game
+Iago Deluxe - Classic Reversi/Othello Game
 
 Usage: play.sh [OPTIONS]
 

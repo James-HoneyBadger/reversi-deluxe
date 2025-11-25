@@ -1,9 +1,9 @@
-# HB_Reversi - User Guide
+# Iago Deluxe - User Guide
 
 **Version:** 2.0.0  
 **Last Updated:** November 19, 2025
 
-Welcome to HB_Reversi! This comprehensive guide will help you get the most out of your Reversi/Othello gaming experience.
+Welcome to Iago Deluxe! This comprehensive guide will help you get the most out of your Reversi/Othello gaming experience.
 
 ## 📋 Table of Contents
 
@@ -22,8 +22,8 @@ Welcome to HB_Reversi! This comprehensive guide will help you get the most out o
 
 **Quick Install:**
 ```bash
-git clone https://github.com/James-HoneyBadger/HB_Reversi.git
-cd HB_Reversi
+git clone https://github.com/James-HoneyBadger/Iago_Deluxe.git
+cd Iago_Deluxe
 ./setup.sh
 ```
 
@@ -139,7 +139,7 @@ A move is legal if it flips at least one opponent piece:
 **Main Game Screen:**
 ```
 ┌─────────────────────────────────────────┐
-│  HB_Reversi v2.0           [Menu Bar]   │
+│  Iago Deluxe v2.0           [Menu Bar]   │
 ├─────────────────────────────────────────┤
 │                                          │
 │         ┌─────────────────┐             │
@@ -653,7 +653,7 @@ A: Not yet. Network multiplayer is planned for v2.1 (Q1 2026). Currently, you ca
 - Watch AI vs AI
 
 **Q: Is this free?**  
-A: Yes! HB_Reversi is open source and completely free. See LICENSE file for details.
+A: Yes! Iago Deluxe is open source and completely free. See LICENSE file for details.
 
 **Q: Can I contribute?**  
 A: Absolutely! See CONTRIBUTING.md for guidelines. We welcome:
@@ -701,7 +701,7 @@ A: Python 3.7 or higher. Tested on:
 - Recommended: Python 3.11+
 
 **Q: Will this work on my operating system?**  
-A: Yes! HB_Reversi works on:
+A: Yes! Iago Deluxe works on:
 - ✅ Linux (all major distributions)
 - ✅ macOS (10.14+)
 - ✅ Windows (10, 11)
@@ -809,14 +809,14 @@ A: Practice methods:
 - [Opening Book Database](http://www.ffothello.org/livres/beginner-cup-en.pdf)
 
 ### Community
-- [GitHub Issues](https://github.com/James-HoneyBadger/HB_Reversi/issues) - Bug reports
-- [GitHub Discussions](https://github.com/James-HoneyBadger/HB_Reversi/discussions) - Questions
+- [GitHub Issues](https://github.com/James-HoneyBadger/Iago_Deluxe/issues) - Bug reports
+- [GitHub Discussions](https://github.com/James-HoneyBadger/Iago_Deluxe/discussions) - Questions
 
 ---
 
 ## Conclusion
 
-Thank you for playing HB_Reversi! We hope this guide helps you enjoy the game and improve your play.
+Thank you for playing Iago Deluxe! We hope this guide helps you enjoy the game and improve your play.
 
 **Remember:**
 - 🎯 Corners are key

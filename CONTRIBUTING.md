@@ -1,6 +1,6 @@
-# Contributing to HB_Reversi
+# Contributing to Iago Deluxe
 
-Thank you for your interest in contributing to HB_Reversi! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to Iago Deluxe! This document provides guidelines and information for contributors.
 
 ## 📋 Table of Contents
 
@@ -34,13 +34,13 @@ Thank you for your interest in contributing to HB_Reversi! This document provide
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/HB_Reversi.git
-   cd HB_Reversi
+   git clone https://github.com/YOUR_USERNAME/Iago_Deluxe.git
+   cd Iago_Deluxe
    ```
 
 3. Add upstream remote:
    ```bash
-   git remote add upstream https://github.com/James-HoneyBadger/HB_Reversi.git
+   git remote add upstream https://github.com/James-HoneyBadger/Iago_Deluxe.git
    ```
 
 ## 🛠️ Development Setup

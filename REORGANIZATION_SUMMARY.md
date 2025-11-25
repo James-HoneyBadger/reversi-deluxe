@@ -1,11 +1,11 @@
-# HB_Reversi Reorganization Summary
+# Iago Deluxe Reorganization Summary
 
 **Date:** November 19, 2025  
 **Version:** 2.0.0
 
 ## Changes Overview
 
-This document summarizes the reorganization of the HB_Reversi project structure and documentation updates.
+This document summarizes the reorganization of the Iago Deluxe project structure and documentation updates.
 
 ## Directory Structure Changes
 
@@ -124,7 +124,7 @@ If you were working on the code:
 ## File Locations Reference
 
 ```
-HB_Reversi/
+Iago_Deluxe/
 ├── config/
 │   └── reversi-settings.json      # User preferences
 │

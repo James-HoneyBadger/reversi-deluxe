@@ -1,6 +1,6 @@
-# HB_Reversi
+# Iago Deluxe
 
-A feature-rich, professionally-crafted implementation of the classic Reversi (Othello) board game with an intelligent AI opponent and comprehensive game analysis.
+Iago Deluxe is a feature-rich, professionally-crafted implementation of the classic Reversi (Othello) board game with an intelligent AI opponent and comprehensive game analysis.
 
 ## ✨ Features
 
@@ -35,8 +35,8 @@ A feature-rich, professionally-crafted implementation of the classic Reversi (Ot
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/James-HoneyBadger/HB_Reversi.git
-   cd HB_Reversi
+   git clone https://github.com/James-HoneyBadger/Iago_Deluxe.git
+   cd Iago_Deluxe
    ```
 
 2. **Run the setup script:**
@@ -92,7 +92,7 @@ The game supports extensive command-line configuration:
 ## 📁 Project Structure
 
 ```
-HB_Reversi/
+Iago_Deluxe/
 ├── main.py                  # Entry point with dependency management
 ├── play.sh                  # Convenient launcher script
 ├── setup.sh                 # Installation and environment setup
@@ -229,7 +229,7 @@ This project is licensed under the terms in the [LICENSE](LICENSE) file.
 ## 📧 Contact
 
 **Author:** James "HoneyBadger"  
-**Repository:** [https://github.com/James-HoneyBadger/HB_Reversi](https://github.com/James-HoneyBadger/HB_Reversi)
+**Repository:** [https://github.com/James-HoneyBadger/Iago_Deluxe](https://github.com/James-HoneyBadger/Iago_Deluxe)
 
 ---
 

@@ -38,7 +38,7 @@
 
 ### Design Philosophy
 
-HB_Reversi follows a **component-based architecture** with clear separation of concerns:
+Iago Deluxe follows a **component-based architecture** with clear separation of concerns:
 
 1. **Game Logic Layer** - Pure game rules and state management
 2. **AI Layer** - Intelligent opponent with configurable difficulty
@@ -57,7 +57,7 @@ HB_Reversi follows a **component-based architecture** with clear separation of c
 ## Project Structure
 
 ```
-HB_Reversi/
+Iago_Deluxe/
 ├── src/                        # Source code package
 │   ├── __init__.py            # Package initialization
 │   ├── Reversi.py             # Main game implementation (5100+ lines)
@@ -478,8 +478,8 @@ class Settings:
 
 1. **Clone repository:**
    ```bash
-   git clone https://github.com/James-HoneyBadger/HB_Reversi.git
-   cd HB_Reversi
+   git clone https://github.com/James-HoneyBadger/Iago_Deluxe.git
+   cd Iago_Deluxe
    ```
 
 2. **Run setup script:**
