@@ -3194,42 +3194,6 @@ class Game:
             auto_y = status_y + 2
             self.screen.blit(auto_text, (auto_x, auto_y))
 
-    def draw_board(self, board_rect, cell, theme):
-        """Draw the clean game board background and grid"""
-        # Clean board background with subtle depth
-        pg.draw.rect(
-            self.screen, theme["felt"], board_rect, border_radius=BORDER_RADIUS
-        )
-
-        # Add subtle inner shadow for depth
-        shadow_color = tuple(max(0, c - 15) for c in theme["felt"])
-        shadow_rect = board_rect.inflate(-4, -4)
-        pg.draw.rect(
-            self.screen, shadow_color, shadow_rect, 2, border_radius=BORDER_RADIUS - 2
-        )
-
-        # Clean, minimal grid lines (only if enabled)
-        if self.settings.show_grid:
-            grid_color = theme["grid"]
-            line_width = 1
-            for i in range(1, self.board.size):  # Skip outer border lines
-                x = board_rect.left + i * cell
-                y = board_rect.top + i * cell
-                pg.draw.line(
-                    self.screen,
-                    grid_color,
-                    (x, board_rect.top + 2),
-                    (x, board_rect.bottom - 2),
-                    line_width,
-                )
-                pg.draw.line(
-                    self.screen,
-                    grid_color,
-                    (board_rect.left + 2, y),
-                    (board_rect.right - 2, y),
-                    line_width,
-                )
-
     def draw_game_pieces(self, board_rect, cell):
         """Draw all game pieces on the board with animations"""
         current_time = time.time()
@@ -3527,88 +3491,235 @@ class Game:
 
         else:  # traditional
             if color == BLACK:
-                # Black checker piece with classic patterns
-                base_color = (20, 20, 20)
+                # Realistic black checker piece with detailed patterns
+                base_color = (15, 15, 15)  # Very dark for depth
 
-                # Main disc body
-                pg.draw.circle(surf, base_color, (center_x, center_y), radius)
+                # Main disc body with slight gradient
+                for i in range(radius, 0, -1):
+                    gradient_factor = (radius - i) / radius
+                    grad_color = (
+                        int(base_color[0] + gradient_factor * 10),
+                        int(base_color[1] + gradient_factor * 10),
+                        int(base_color[2] + gradient_factor * 10)
+                    )
+                    pg.draw.circle(surf, grad_color, (center_x, center_y), i)
 
-                # Classic checker patterns - radial lines from center
-                pattern_color = (65, 65, 65)  # Lighter for better visibility on black
-                num_lines = 16  # Number of radial lines
+                # Detailed checker patterns - radial lines with varying thickness
+                pattern_color = (80, 80, 80)
+                num_lines = 24  # More lines for detail
 
                 for i in range(num_lines):
                     angle = (2 * math.pi * i) / num_lines
-                    # Draw radial lines from center outward
-                    start_x = center_x + math.cos(angle) * (radius * 0.2)
-                    start_y = center_y + math.sin(angle) * (radius * 0.2)
-                    end_x = center_x + math.cos(angle) * (radius * 0.85)
-                    end_y = center_y + math.sin(angle) * (radius * 0.85)
-                    pg.draw.line(
-                        surf, pattern_color, (start_x, start_y), (end_x, end_y), 1
-                    )
+                    # Vary line thickness slightly
+                    thickness = 1 if i % 3 != 0 else 2
 
-                # Add concentric circles for classic checker look
-                for ring in range(1, 4):
-                    ring_radius = radius * (0.3 + ring * 0.2)
-                    pg.draw.circle(
-                        surf, pattern_color, (center_x, center_y), int(ring_radius), 1
-                    )
+                    # Draw radial lines from center outward with slight curve
+                    for dist in range(int(radius * 0.15), int(radius * 0.9), 2):
+                        x = center_x + math.cos(angle) * dist
+                        y = center_y + math.sin(angle) * dist
+                        # Add slight waviness
+                        wave = math.sin(dist * 0.1) * 1.5
+                        wx = x + math.cos(angle + math.pi/2) * wave
+                        wy = y + math.sin(angle + math.pi/2) * wave
+                        if 0 <= wx < size and 0 <= wy < size:
+                            surf.set_at((int(wx), int(wy)), pattern_color)
+
+                # Add concentric circles with varying opacity
+                for ring in range(1, 5):
+                    ring_radius = radius * (0.2 + ring * 0.15)
+                    # Create subtle ring with gradient
+                    for r_offset in range(-1, 2):
+                        ring_color = (
+                            min(255, pattern_color[0] + r_offset * 20),
+                            min(255, pattern_color[1] + r_offset * 20),
+                            min(255, pattern_color[2] + r_offset * 20)
+                        )
+                        pg.draw.circle(
+                            surf, ring_color, (center_x, center_y),
+                            int(ring_radius + r_offset), 1
+                        )
 
             else:  # WHITE
-                # White checker piece with classic patterns
-                base_color = (245, 245, 245)
+                # Realistic white checker piece with detailed patterns
+                base_color = (250, 250, 250)  # Bright white
 
-                # Main disc body
-                pg.draw.circle(surf, base_color, (center_x, center_y), radius)
+                # Main disc body with slight gradient
+                for i in range(radius, 0, -1):
+                    gradient_factor = (radius - i) / radius
+                    grad_color = (
+                        int(base_color[0] - gradient_factor * 15),
+                        int(base_color[1] - gradient_factor * 15),
+                        int(base_color[2] - gradient_factor * 15)
+                    )
+                    pg.draw.circle(surf, grad_color, (center_x, center_y), i)
 
-                # Classic checker patterns - radial lines from center
-                pattern_color = (200, 200, 200)  # Darker gray for visibility on white
-                num_lines = 16  # Number of radial lines
+                # Detailed checker patterns - radial lines
+                pattern_color = (180, 180, 180)
+                num_lines = 24
 
                 for i in range(num_lines):
                     angle = (2 * math.pi * i) / num_lines
-                    # Draw radial lines from center outward
-                    start_x = center_x + math.cos(angle) * (radius * 0.2)
-                    start_y = center_y + math.sin(angle) * (radius * 0.2)
-                    end_x = center_x + math.cos(angle) * (radius * 0.85)
-                    end_y = center_y + math.sin(angle) * (radius * 0.85)
-                    pg.draw.line(
-                        surf, pattern_color, (start_x, start_y), (end_x, end_y), 1
-                    )
+                    thickness = 1 if i % 3 != 0 else 2
 
-                # Add concentric circles for classic checker look
-                for ring in range(1, 4):
-                    ring_radius = radius * (0.3 + ring * 0.2)
-                    pg.draw.circle(
-                        surf, pattern_color, (center_x, center_y), int(ring_radius), 1
-                    )
+                    # Draw radial lines with slight curve
+                    for dist in range(int(radius * 0.15), int(radius * 0.9), 2):
+                        x = center_x + math.cos(angle) * dist
+                        y = center_y + math.sin(angle) * dist
+                        wave = math.sin(dist * 0.1) * 1.5
+                        wx = x + math.cos(angle + math.pi/2) * wave
+                        wy = y + math.sin(angle + math.pi/2) * wave
+                        if 0 <= wx < size and 0 <= wy < size:
+                            surf.set_at((int(wx), int(wy)), pattern_color)
 
-            # Clean rim for definition
-            rim_color = (0, 0, 0) if color == BLACK else (180, 180, 180)
-            pg.draw.circle(surf, rim_color, (center_x, center_y), radius, 2)
+                # Add concentric circles
+                for ring in range(1, 5):
+                    ring_radius = radius * (0.2 + ring * 0.15)
+                    for r_offset in range(-1, 2):
+                        ring_color = (
+                            max(0, pattern_color[0] + r_offset * 15),
+                            max(0, pattern_color[1] + r_offset * 15),
+                            max(0, pattern_color[2] + r_offset * 15)
+                        )
+                        pg.draw.circle(
+                            surf, ring_color, (center_x, center_y),
+                            int(ring_radius + r_offset), 1
+                        )
 
-        # Subtle bevel edge for 3D effect
-        if color == BLACK:
-            # Light edge on top-left
-            pg.draw.arc(
-                surf,
-                (60, 60, 60),
-                (center_x - radius, center_y - radius, radius * 2, radius * 2),
-                math.pi,
-                math.pi * 1.5,
-                1,
+            # Enhanced rim for definition with beveled edge
+            rim_color = (0, 0, 0) if color == BLACK else (120, 120, 120)
+            pg.draw.circle(surf, rim_color, (center_x, center_y), radius, 3)
+
+            # Add realistic bevel effect
+            if color == BLACK:
+                # Light highlight on top-left quarter
+                highlight_color = (100, 100, 100)
+                pg.draw.arc(
+                    surf,
+                    highlight_color,
+                    (center_x - radius, center_y - radius, radius * 2, radius * 2),
+                    math.pi,
+                    math.pi * 1.5,
+                    2,
+                )
+                # Dark shadow on bottom-right
+                shadow_color = (0, 0, 0)
+                pg.draw.arc(
+                    surf,
+                    shadow_color,
+                    (center_x - radius, center_y - radius, radius * 2, radius * 2),
+                    0,
+                    math.pi * 0.5,
+                    2,
+                )
+            else:
+                # Subtle shadow on bottom-right for white pieces
+                shadow_color = (200, 200, 200)
+                pg.draw.arc(
+                    surf,
+                    shadow_color,
+                    (center_x - radius, center_y - radius, radius * 2, radius * 2),
+                    0,
+                    math.pi * 0.5,
+                    1,
+                )
+
+        return surf
+
+    def draw_board(self, board_rect, cell, theme):
+        """Draw the realistic wooden game board with proper grain and depth"""
+        # Create wood grain texture
+        wood_surf = self._create_wood_texture(board_rect.size)
+
+        # Apply the wood texture to the board
+        self.screen.blit(wood_surf, board_rect.topleft)
+
+        # Add subtle border for definition
+        border_color = (40, 20, 0)  # Dark wood border
+        pg.draw.rect(
+            self.screen, border_color, board_rect, 3, border_radius=BORDER_RADIUS
+        )
+
+        # Add inner shadow for depth
+        shadow_color = (0, 0, 0, 40)
+        shadow_rect = board_rect.inflate(-6, -6)
+        shadow_surf = pg.Surface(shadow_rect.size, pg.SRCALPHA)
+        pg.draw.rect(
+            shadow_surf, shadow_color, shadow_surf.get_rect(), border_radius=BORDER_RADIUS - 3
+        )
+        self.screen.blit(shadow_surf, shadow_rect.topleft)
+
+        # Clean, minimal grid lines (only if enabled)
+        if self.settings.show_grid:
+            grid_color = (60, 30, 10, 120)  # Semi-transparent dark wood color
+            line_width = 1
+            for i in range(1, self.board.size):  # Skip outer border lines
+                x = board_rect.left + i * cell
+                y = board_rect.top + i * cell
+                # Vertical lines
+                pg.draw.line(
+                    self.screen,
+                    grid_color,
+                    (x, board_rect.top + 3),
+                    (x, board_rect.bottom - 3),
+                    line_width,
+                )
+                # Horizontal lines
+                pg.draw.line(
+                    self.screen,
+                    grid_color,
+                    (board_rect.left + 3, y),
+                    (board_rect.right - 3, y),
+                    line_width,
+                )
+
+    def _create_wood_texture(self, size):
+        """Create a realistic wood grain texture for the board"""
+        width, height = size
+        surf = pg.Surface((width, height))
+
+        # Base wood color - rich brown
+        base_color = (139, 69, 19)  # Saddle brown
+
+        # Fill with base color
+        surf.fill(base_color)
+
+        # Add wood grain patterns
+        for y in range(0, height, 4):
+            # Create horizontal grain lines with slight color variation
+            grain_color = (
+                min(255, base_color[0] + random.randint(-20, 20)),
+                min(255, base_color[1] + random.randint(-15, 15)),
+                min(255, base_color[2] + random.randint(-10, 10))
             )
-        else:
-            # Soft shadow on bottom-right
-            pg.draw.arc(
-                surf,
-                (200, 200, 200),
-                (center_x - radius, center_y - radius, radius * 2, radius * 2),
-                0,
-                math.pi * 0.5,
-                1,
+
+            # Draw wavy grain lines
+            for x in range(width):
+                wave_offset = int(math.sin(x * 0.02 + y * 0.1) * 2)
+                if random.random() < 0.3:  # Sparse grain lines
+                    surf.set_at((x, y + wave_offset), grain_color)
+
+        # Add some darker knots and grain variations
+        for _ in range(width * height // 1000):  # Sparse knots
+            x = random.randint(0, width - 1)
+            y = random.randint(0, height - 1)
+            knot_color = (
+                max(0, base_color[0] - random.randint(20, 40)),
+                max(0, base_color[1] - random.randint(15, 30)),
+                max(0, base_color[2] - random.randint(10, 20))
             )
+            # Draw small knot
+            pg.draw.circle(surf, knot_color, (x, y), random.randint(2, 5))
+
+        # Add subtle vertical grain
+        for x in range(0, width, 6):
+            for y in range(height):
+                if random.random() < 0.1:
+                    grain_color = (
+                        min(255, base_color[0] + random.randint(-10, 10)),
+                        min(255, base_color[1] + random.randint(-8, 8)),
+                        min(255, base_color[2] + random.randint(-5, 5))
+                    )
+                    surf.set_at((x, y), grain_color)
 
         return surf
 
@@ -3668,18 +3779,6 @@ class Game:
             self.screen.blit(disc_surf, disc_rect)
 
     def draw_move_history(self, history_rect, theme):
-        """Draw the move history panel"""
-        # Panel background
-        pg.draw.rect(self.screen, theme["felt"], history_rect)
-        pg.draw.rect(self.screen, theme["grid"], history_rect, 2)
-
-        # Title
-        font = pg.font.Font(None, 24)
-        title_text = font.render("Move History", True, theme["text"])
-        title_rect = title_text.get_rect(
-            centerx=history_rect.centerx, top=history_rect.top + 10
-        )
-        self.screen.blit(title_text, title_rect)
 
         # History content area
         content_rect = pg.Rect(
@@ -4925,6 +5024,24 @@ Comment=Classic Iago/Othello board game with AI
 
 def main(argv: List[str] = None):
     """Main entry point - GUI only interface"""
+    # Check for display availability
+    import os
+    if not os.environ.get('DISPLAY'):
+        print("Error: No display available. This game requires a graphical environment.", file=sys.stderr)
+        print("Please run this program on a system with a graphical desktop.", file=sys.stderr)
+        return 1
+
+    try:
+        import pygame as pg
+        pg.init()
+        test_screen = pg.display.set_mode((100, 100))
+        pg.display.quit()
+        pg.quit()
+    except (pg.error, Exception) as e:
+        print("Error: Cannot initialize graphics. This game requires a graphical environment.", file=sys.stderr)
+        print(f"Details: {e}", file=sys.stderr)
+        return 1
+
     # Setup logging if available
     try:
         from src.logger import GameLogger
